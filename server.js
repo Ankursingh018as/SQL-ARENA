@@ -30,11 +30,7 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-// Health check endpoint (BEFORE database connection)
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'healthy' });
-});
-
+// Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
 
@@ -46,23 +42,27 @@ console.log('Environment:', {
   DATABASE_URL: process.env.MYSQL_URL ? 'Set' : 'Not Set'
 });
 
-// Routes (only load after database connection)
-const setupRoutes = () => {
-  const authRoutes = require('./routes/auth');
-  const challengeRoutes = require('./routes/challenges');
-  const leaderboardRoutes = require('./routes/leaderboard');
-  const userChallengeRoutes = require('./routes/userChallenges');
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'healthy' });
+});
 
-  app.use('/api/auth', authRoutes);
-  app.use('/api/challenges', challengeRoutes);
-  app.use('/api/leaderboard', leaderboardRoutes);
-  app.use('/api/user-challenges', userChallengeRoutes);
+// Import routes
+const authRoutes = require('./routes/auth');
+const challengeRoutes = require('./routes/challenges');
+const leaderboardRoutes = require('./routes/leaderboard');
+const userChallengeRoutes = require('./routes/userChallenges');
 
-  // Test route
-  app.get('/', (req, res) => {
-    res.json({ message: 'Welcome to SQL Arena API' });
-  });
-};
+// Setup routes immediately
+app.use('/api/auth', authRoutes);
+app.use('/api/challenges', challengeRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/user-challenges', userChallengeRoutes);
+
+// Test route
+app.get('/', (req, res) => {
+  res.json({ message: 'Welcome to SQL Arena API' });
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -71,21 +71,19 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Start server without waiting for database
+// Start server
 const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log('Health check endpoint available at /api/health');
 });
 
-// Connect to database after server is running
+// Connect to database after server and routes are setup
 const initDatabase = async () => {
   try {
     await sequelize.authenticate();
     console.log('Database connection established successfully.');
-    setupRoutes();
   } catch (error) {
     console.error('Unable to connect to the database:', error);
-    // Don't exit process, just log the error
     console.log('Server will continue running without database connection');
   }
 };
