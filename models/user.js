@@ -1,8 +1,17 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
 const bcrypt = require('bcryptjs');
 
 module.exports = (sequelize) => {
-  const User = sequelize.define('User', {
+  class User extends Model {
+    static associate(models) {
+      User.hasMany(models.UserChallenge, {
+        foreignKey: 'UserId',
+        as: 'challenges'
+      });
+    }
+  }
+
+  User.init({
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
@@ -11,7 +20,10 @@ module.exports = (sequelize) => {
     username: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true
+      unique: true,
+      validate: {
+        len: [3, 30]
+      }
     },
     email: {
       type: DataTypes.STRING,
@@ -46,6 +58,9 @@ module.exports = (sequelize) => {
       defaultValue: 0
     }
   }, {
+    sequelize,
+    modelName: 'User',
+    timestamps: true,
     hooks: {
       beforeCreate: async (user) => {
         if (user.password) {

@@ -1,44 +1,56 @@
 const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 const { Op } = require('sequelize');
+const auth = require('../middleware/auth');
 
-const router = express.Router();
-
-// Register new user
+// Register
 router.post('/register', async (req, res) => {
   try {
+    console.log('Registration attempt:', { ...req.body, password: '[REDACTED]' });
     const { username, email, password } = req.body;
 
+    // Validation
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Please provide all required fields' });
+    }
+
     // Check if user already exists
-    const existingUser = await User.findOne({
+    const existingUser = await User.findOne({ 
       where: {
         [Op.or]: [{ email }, { username }]
       }
     });
 
     if (existingUser) {
-      return res.status(400).json({
-        error: 'User with this email or username already exists'
+      return res.status(400).json({ 
+        error: 'User with this email or username already exists' 
       });
     }
 
-    // Create new user
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create user
     const user = await User.create({
+      id: require('uuid').v4(),
       username,
       email,
-      password
+      password: hashedPassword
     });
 
-    // Generate JWT token
+    // Create token
     const token = jwt.sign(
       { id: user.id, username: user.username },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
+      { expiresIn: '24h' }
     );
 
+    // Send response
     res.status(201).json({
-      message: 'User registered successfully',
       token,
       user: {
         id: user.id,
@@ -48,16 +60,22 @@ router.post('/register', async (req, res) => {
         level: user.level
       }
     });
+
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ error: 'Error registering user' });
   }
 });
 
-// Login user
+// Login
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Please provide all required fields' });
+    }
 
     // Find user
     const user = await User.findOne({ where: { email } });
@@ -65,21 +83,21 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Validate password
-    const isValidPassword = await user.validatePassword(password);
-    if (!isValidPassword) {
+    // Check password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Generate JWT token
+    // Create token
     const token = jwt.sign(
       { id: user.id, username: user.username },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
+      { expiresIn: '24h' }
     );
 
+    // Send response
     res.json({
-      message: 'Login successful',
       token,
       user: {
         id: user.id,
@@ -89,6 +107,7 @@ router.post('/login', async (req, res) => {
         level: user.level
       }
     });
+
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Error logging in' });
@@ -96,20 +115,19 @@ router.post('/login', async (req, res) => {
 });
 
 // Get user profile
-router.get('/profile', async (req, res) => {
+router.get('/profile', auth, async (req, res) => {
   try {
-    const userId = req.user.id; // From auth middleware
-    const user = await User.findByPk(userId, {
+    const user = await User.findByPk(req.user.id, {
       attributes: { exclude: ['password'] }
     });
-
+    
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     res.json(user);
   } catch (error) {
-    console.error('Profile error:', error);
+    console.error('Profile fetch error:', error);
     res.status(500).json({ error: 'Error fetching profile' });
   }
 });
