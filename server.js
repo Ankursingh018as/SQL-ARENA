@@ -22,25 +22,25 @@ const corsOptions = {
 };
 
 console.log('CORS Origin:', corsOptions.origin);
+console.log('Environment:', process.env.NODE_ENV);
 
 app.use(cors(corsOptions));
 app.use(express.json());
+
+// Health check endpoint (before other routes)
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'healthy' });
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/challenges', challengeRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
-app.use('/api/health', healthRouter);
 app.use('/api/user-challenges', userChallengeRoutes);
 
 // Test route
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to SQL Arena API' });
-});
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
 });
 
 // Error handling middleware
@@ -50,12 +50,19 @@ app.use((err, req, res, next) => {
 });
 
 // Sync database and start server
-sequelize.sync()
-  .then(() => {
+const startServer = async () => {
+  try {
+    await sequelize.authenticate();
+    console.log('Database connection established successfully.');
+    
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
+      console.log('Health check endpoint available at /api/health');
     });
-  })
-  .catch(err => {
-    console.error('Database connection error:', err);
-  }); 
+  } catch (error) {
+    console.error('Unable to connect to the database:', error);
+    process.exit(1);
+  }
+};
+
+startServer(); 
