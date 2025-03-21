@@ -2,11 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const { sequelize } = require('./models');
-const authRoutes = require('./routes/auth');
-const challengeRoutes = require('./routes/challenges');
-const leaderboardRoutes = require('./routes/leaderboard');
-const healthRouter = require('./routes/health');
-const userChallengeRoutes = require('./routes/userChallenges');
 
 dotenv.config();
 
@@ -21,48 +16,64 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-console.log('CORS Origin:', corsOptions.origin);
-console.log('Environment:', process.env.NODE_ENV);
-
-app.use(cors(corsOptions));
-app.use(express.json());
-
-// Health check endpoint (before other routes)
+// Health check endpoint (BEFORE database connection)
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'healthy' });
 });
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/challenges', challengeRoutes);
-app.use('/api/leaderboard', leaderboardRoutes);
-app.use('/api/user-challenges', userChallengeRoutes);
+app.use(cors(corsOptions));
+app.use(express.json());
 
-// Test route
-app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to SQL Arena API' });
+// Log environment details
+console.log('Environment:', {
+  NODE_ENV: process.env.NODE_ENV,
+  PORT: PORT,
+  CORS_ORIGIN: corsOptions.origin,
+  DATABASE_URL: process.env.MYSQL_URL ? 'Set' : 'Not Set'
 });
+
+// Routes (only load after database connection)
+const setupRoutes = () => {
+  const authRoutes = require('./routes/auth');
+  const challengeRoutes = require('./routes/challenges');
+  const leaderboardRoutes = require('./routes/leaderboard');
+  const userChallengeRoutes = require('./routes/userChallenges');
+
+  app.use('/api/auth', authRoutes);
+  app.use('/api/challenges', challengeRoutes);
+  app.use('/api/leaderboard', leaderboardRoutes);
+  app.use('/api/user-challenges', userChallengeRoutes);
+
+  // Test route
+  app.get('/', (req, res) => {
+    res.json({ message: 'Welcome to SQL Arena API' });
+  });
+};
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Error:', err.message);
+  console.error('Stack:', err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Sync database and start server
-const startServer = async () => {
+// Start server without waiting for database
+const server = app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+  console.log('Health check endpoint available at /api/health');
+});
+
+// Connect to database after server is running
+const initDatabase = async () => {
   try {
     await sequelize.authenticate();
     console.log('Database connection established successfully.');
-    
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-      console.log('Health check endpoint available at /api/health');
-    });
+    setupRoutes();
   } catch (error) {
     console.error('Unable to connect to the database:', error);
-    process.exit(1);
+    // Don't exit process, just log the error
+    console.log('Server will continue running without database connection');
   }
 };
 
-startServer(); 
+initDatabase(); 
