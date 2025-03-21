@@ -9,6 +9,6 @@
     }
   ],
   "env": {
-    "REACT_APP_API_URL": "BACKEND_URL_PLACEHOLDER"
+    "REACT_APP_API_URL": "https://sql-arena-production.up.railway.app"
   }
 } 

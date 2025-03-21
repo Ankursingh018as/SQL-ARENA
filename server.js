@@ -8,9 +8,23 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+// CORS Configuration
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'https://sql-arena-aw3j.vercel.app',
+  'http://localhost:3000'
+];
+
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'https://sql-arena.vercel.app',
+  origin: function (origin, callback) {
+    console.log('Request origin:', origin);
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('Origin not allowed:', origin);
+      callback(null, false);
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -28,7 +42,7 @@ app.use(express.json());
 console.log('Environment:', {
   NODE_ENV: process.env.NODE_ENV,
   PORT: PORT,
-  CORS_ORIGIN: corsOptions.origin,
+  ALLOWED_ORIGINS: allowedOrigins,
   DATABASE_URL: process.env.MYSQL_URL ? 'Set' : 'Not Set'
 });
 
