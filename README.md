@@ -29,7 +29,7 @@ An interactive platform for learning and practicing SQL queries with real-time f
 
 1. Clone the repository:
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Ankursingh018as/SQL-ARENA.git
 cd sql-learning-platform
 ```
 
